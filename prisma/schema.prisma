@@ -1,0 +1,137 @@
+generator client {
+  provider = "prisma-client-js"
+}
+
+datasource db {
+  provider = "postgresql"
+  url      = env("DATABASE_URL")
+}
+
+enum MemberRole {
+  OWNER
+  ADMIN
+  MEMBER
+}
+
+enum WorkType {
+  TASK
+  BUG
+}
+
+enum WorkStatus {
+  BACKLOG
+  TODO
+  IN_PROGRESS
+  IN_REVIEW
+  DONE
+}
+
+enum WorkPriority {
+  LOW
+  MEDIUM
+  HIGH
+  URGENT
+}
+
+model User {
+  id           String        @id @default(cuid())
+  name         String
+  email        String        @unique
+  passwordHash String
+  avatarUrl    String?
+  memberships  ProjectMember[]
+  assignedWork WorkItem[]    @relation("Assignee")
+  messages     Message[]
+  activities   Activity[]
+  createdAt    DateTime      @default(now())
+  updatedAt    DateTime      @updatedAt
+}
+
+model Project {
+  id          String          @id @default(cuid())
+  name        String
+  description String          @default("")
+  color       String          @default("#5b6e5d")
+  members     ProjectMember[]
+  workItems   WorkItem[]
+  messages    Message[]
+  goals       MonthlyGoal[]
+  activities  Activity[]
+  createdAt   DateTime        @default(now())
+  updatedAt   DateTime        @updatedAt
+}
+
+model ProjectMember {
+  id        String     @id @default(cuid())
+  projectId String
+  userId    String
+  role      MemberRole @default(MEMBER)
+  project   Project    @relation(fields: [projectId], references: [id], onDelete: Cascade)
+  user      User       @relation(fields: [userId], references: [id], onDelete: Cascade)
+  joinedAt  DateTime   @default(now())
+
+  @@unique([projectId, userId])
+  @@index([userId])
+}
+
+model WorkItem {
+  id          String       @id @default(cuid())
+  projectId   String
+  assigneeId  String?
+  type        WorkType     @default(TASK)
+  title       String
+  description String       @default("")
+  status      WorkStatus   @default(TODO)
+  priority    WorkPriority @default(MEDIUM)
+  dueDate     DateTime?
+  project     Project      @relation(fields: [projectId], references: [id], onDelete: Cascade)
+  assignee    User?        @relation("Assignee", fields: [assigneeId], references: [id], onDelete: SetNull)
+  activities  Activity[]
+  createdAt   DateTime     @default(now())
+  updatedAt   DateTime     @updatedAt
+
+  @@index([projectId, status])
+  @@index([projectId, dueDate])
+  @@index([assigneeId])
+}
+
+model Message {
+  id        String   @id @default(cuid())
+  projectId String
+  authorId  String
+  body      String
+  project   Project  @relation(fields: [projectId], references: [id], onDelete: Cascade)
+  author    User     @relation(fields: [authorId], references: [id], onDelete: Cascade)
+  createdAt DateTime @default(now())
+
+  @@index([projectId, createdAt])
+}
+
+model MonthlyGoal {
+  id        String   @id @default(cuid())
+  projectId String
+  title     String
+  details   String   @default("")
+  month     DateTime
+  complete  Boolean  @default(false)
+  project   Project  @relation(fields: [projectId], references: [id], onDelete: Cascade)
+  createdAt DateTime @default(now())
+  updatedAt DateTime @updatedAt
+
+  @@index([projectId, month])
+}
+
+model Activity {
+  id        String   @id @default(cuid())
+  projectId String
+  actorId   String?
+  workItemId String?
+  action    String
+  detail    String   @default("")
+  project   Project  @relation(fields: [projectId], references: [id], onDelete: Cascade)
+  actor     User?    @relation(fields: [actorId], references: [id], onDelete: SetNull)
+  workItem  WorkItem? @relation(fields: [workItemId], references: [id], onDelete: Cascade)
+  createdAt DateTime @default(now())
+
+  @@index([projectId, createdAt])
+}
